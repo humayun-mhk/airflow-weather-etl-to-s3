@@ -1,170 +1,225 @@
-🌦️ Weather Data ETL Pipeline using Apache Airflow & AWS S3
+A production-ready ETL pipeline that extracts real-time weather data from OpenWeatherMap API, transforms it using Python, and loads it into AWS S3. Built with Apache Airflow and containerized with Docker for seamless orchestration and deployment.
 
-This project demonstrates a production-style ETL (Extract, Transform, Load) pipeline built using Apache Airflow, where real-time weather data is fetched from a public API, transformed using Python, and stored in Amazon S3 as a CSV file.
+![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)
+![Airflow](https://img.shields.io/badge/Apache%20Airflow-2.0+-red.svg)
+![AWS](https://img.shields.io/badge/AWS-S3-orange.svg)
+![Docker](https://img.shields.io/badge/Docker-Compose-blue.svg)
 
-The pipeline is containerized using Docker and showcases orchestration, scheduling, monitoring, and cloud storage integration.
+## 🚀 Architecture Overview
+```
+┌─────────────┐    ┌──────────────┐    ┌──────────────┐    ┌─────────┐
+│ Weather API │ -> │ Airflow DAG  │ -> │ Transform    │ -> │  AWS S3 │
+│ (OpenWeather)│    │ Orchestration│    │ (Pandas)     │    │  (CSV)  │
+└─────────────┘    └──────────────┘    └──────────────┘    └─────────┘
+```
 
-🚀 Architecture Overview
+### Pipeline Stages
+1. **Check** - Verify API availability
+2. **Extract** - Fetch weather data from API
+3. **Transform** - Process and structure data
+4. **Load** - Upload to AWS S3
 
-Data Flow:
+## 🛠️ Tech Stack
 
-Weather API → Airflow (ETL DAG) → Data Transformation → AWS S3 (CSV)
+- **Orchestration**: Apache Airflow
+- **Containerization**: Docker, Docker Compose
+- **Data Processing**: Python, Pandas
+- **Cloud Storage**: AWS S3 (Boto3)
+- **Data Source**: OpenWeatherMap API
 
-
-Pipeline Stages:
-
-API Availability Check
-
-Weather Data Extraction
-
-Data Transformation
-
-Load into Amazon S3
-
-🛠️ Tech Stack
-
-Apache Airflow
-
-Docker & Docker Compose
-
-Python
-
-AWS S3
-
-Pandas
-
-Boto3
-
-OpenWeatherMap API
-
-📂 Project Structure
-.
+## 📂 Project Structure
+```
+weather-etl-pipeline/
 ├── dags/
-│   └── weather_api_to_s3.py
-├── docker-compose.yml
-├── requirements.txt
-├── README.md
+│   └── weather_api_to_s3.py      # Main Airflow DAG
+├── docker-compose.yml             # Docker services configuration
+├── requirements.txt               # Python dependencies
+├── .env.example                   # Environment variables template
+└── README.md
+```
 
-⚙️ Airflow DAG Description
+## ⚙️ DAG Configuration
 
-DAG Name: weather_api_to_s3
-Schedule: Daily
-Catchup: Disabled
+| Property | Value |
+|----------|-------|
+| **DAG Name** | `weather_api_to_s3` |
+| **Schedule** | Daily (`@daily`) |
+| **Catchup** | Disabled |
+| **Start Date** | 2024-01-01 |
 
-🧩 Tasks Breakdown
-1️⃣ is_api_ready (HttpSensor)
+### 🧩 Tasks
 
-Checks if the Weather API is reachable before execution.
+#### 1️⃣ `is_api_ready` (HttpSensor)
+- Checks OpenWeatherMap API availability
+- Prevents downstream failures
+- Timeout: 120 seconds
 
-Prevents downstream failures.
+#### 2️⃣ `extract_weather_data` (HttpOperator)
+- Fetches real-time weather data
+- Stores response in XCom for downstream tasks
+- Error handling for API failures
 
-2️⃣ extract_weather_data (HttpOperator)
+#### 3️⃣ `transform_load` (PythonOperator)
+- **Transform**:
+  - Converts Kelvin → Fahrenheit
+  - Normalizes data structure
+  - Converts timestamps to UTC
+- **Load**:
+  - Serializes to CSV (in-memory)
+  - Uploads to S3 with timestamped filename
 
-Fetches live weather data from OpenWeatherMap.
+## 🧠 Data Transformations
+```python
+# Temperature Conversion
+temp_fahrenheit = (temp_kelvin - 273.15) * 9/5 + 32
 
-Pushes the response to XCom.
+# Data Structure
+{
+    "City": "Portland",
+    "Description": "clear sky",
+    "Temp_F": 72.5,
+    "Feels_Like_F": 70.3,
+    "Min_Temp_F": 68.0,
+    "Max_Temp_F": 75.0,
+    "Pressure": 1013,
+    "Humidity": 65,
+    "Wind_Speed": 5.2,
+    "Time": "2024-02-08 11:26:45"
+}
+```
 
-3️⃣ transform_load (PythonOperator)
+## ☁️ AWS S3 Output
 
-Converts temperature from Kelvin → Fahrenheit
+**Bucket**: `weather-api-airflow-mhk`
 
-Selects and structures meaningful fields
+**Path Structure**:
+```
+s3://weather-api-airflow-mhk/weather/weather_YYYYMMDD_HHMMSS.csv
+```
 
-Stores the transformed data as a CSV file
-
-Uploads the file to Amazon S3
-
-🧠 Key Transformations
-
-Temperature conversion (Kelvin → Fahrenheit)
-
-Data normalization using Pandas
-
-Timestamp conversion to UTC
-
-CSV serialization using in-memory buffers
-
-☁️ AWS S3 Output
-
-Bucket: weather-api-airflow-mhk
-
-Path: weather/
-
-Filename format:
-
-weather_YYYYMMDD_HHMMSS.csv
-
-
-Example:
-
+**Example**:
+```
 weather/weather_20260208_112645.csv
+```
 
-🧪 Sample Output Fields
-Column	Description
-City	City name
-Description	Weather description
-Temp_F	Temperature (°F)
-Feels_Like_F	Feels-like temperature
-Min_Temp_F	Minimum temperature
-Max_Temp_F	Maximum temperature
-Pressure	Atmospheric pressure
-Humidity	Humidity percentage
-Wind_Speed	Wind speed
-Time	UTC timestamp
-🐳 Running the Project Locally
-1️⃣ Start Airflow
+### Output Schema
+
+| Column | Description |
+|--------|-------------|
+| `City` | City name |
+| `Description` | Weather description (e.g., "clear sky") |
+| `Temp_F` | Temperature in Fahrenheit |
+| `Feels_Like_F` | Feels-like temperature |
+| `Min_Temp_F` | Minimum temperature |
+| `Max_Temp_F` | Maximum temperature |
+| `Pressure` | Atmospheric pressure (hPa) |
+| `Humidity` | Humidity percentage |
+| `Wind_Speed` | Wind speed (m/s) |
+| `Time` | UTC timestamp |
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- Docker & Docker Compose
+- AWS Account with S3 access
+- OpenWeatherMap API key
+
+### Installation
+
+1. **Clone the repository**
+```bash
+git clone https://github.com/yourusername/weather-etl-pipeline.git
+cd weather-etl-pipeline
+```
+
+2. **Set up environment variables**
+```bash
+cp .env.example .env
+# Edit .env with your credentials
+```
+
+3. **Start Airflow**
+```bash
 docker-compose up -d
+```
 
-2️⃣ Open Airflow UI
+4. **Access Airflow UI**
+```
 http://localhost:8080
+```
+Default credentials: `airflow` / `airflow`
 
-3️⃣ Trigger the DAG
+### Configuration
 
-Enable weather_api_to_s3
+#### Airflow Connections
 
-Trigger manually or wait for schedule
+**HTTP Connection (Weather API)**
+```
+Connection ID: weathermap_api
+Connection Type: HTTP
+Host: https://api.openweathermap.org
+```
 
-📸 Screenshots
-Airflow DAG Execution
+**AWS Connection (S3)**
+```
+Connection ID: aws_default
+Connection Type: Amazon Web Services
+AWS Access Key ID: <your-access-key>
+AWS Secret Access Key: <your-secret-key>
+Region: us-east-1
+```
 
-✔ All tasks executed successfully
-✔ ETL completed without errors
+## 📊 Monitoring & Execution
 
-AWS S3 Storage
+1. Navigate to Airflow UI
+2. Enable the `weather_api_to_s3` DAG
+3. Trigger manually or wait for scheduled run
+4. Monitor task execution in Graph/Tree view
+5. Check S3 bucket for output files
 
-✔ CSV file stored in S3 bucket
-✔ Timestamped file naming
+## 🧪 Testing
+```bash
+# Run tests (if implemented)
+pytest tests/
 
-(Screenshots included in repository)
+# Validate DAG
+python dags/weather_api_to_s3.py
+```
 
-🔐 Configuration Notes
+## 📸 Screenshots
 
-Weather API credentials are configured using Airflow HTTP Connection
+### Airflow DAG Graph View
+![DAG Graph](screenshots/dag_graph.png)
 
-AWS credentials are managed using Airflow AWS Connection
+### AWS S3 Output
+![S3 Bucket](screenshots/s3_output.png)
 
-No secrets are hard-coded
+## 🎯 Learning Outcomes
 
-🎯 Learning Outcomes
+✅ Real-world ETL pipeline design  
+✅ Apache Airflow orchestration & scheduling  
+✅ API integration & error handling  
+✅ Cloud storage (AWS S3) integration  
+✅ Dockerized data engineering workflow  
+✅ Production-grade configuration management  
 
-Real-world ETL pipeline design
+## 🔮 Future Enhancements
 
-Apache Airflow orchestration
+- [ ] Add data quality validation checks
+- [ ] Implement data partitioning by date
+- [ ] Convert CSV to Parquet format
+- [ ] Integrate AWS Glue Catalog
+- [ ] Add Athena query support
+- [ ] Implement alerting via Airflow callbacks/SLAs
+- [ ] Add unit & integration tests
+- [ ] Create CI/CD pipeline
+- [ ] Add historical data backfill capability
 
-API data ingestion
+## 🤝 Contributing
 
-Cloud storage integration
+Contributions are welcome! Please feel free to submit a Pull Request.
 
-Dockerized data engineering workflow
+## 📄 License
 
-📌 Future Enhancements
-
-Add data validation checks
-
-Partition data by date
-
-Store data in Parquet format
-
-Integrate AWS Glue / Athena
-
-Add alerting using Airflow callbacks
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
