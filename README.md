@@ -27,16 +27,7 @@ A production-ready ETL pipeline that extracts real-time weather data from OpenWe
 - **Cloud Storage**: AWS S3 (Boto3)
 - **Data Source**: OpenWeatherMap API
 
-## 📂 Project Structure
-```
-weather-etl-pipeline/
-├── dags/
-│   └── weather_api_to_s3.py      # Main Airflow DAG
-├── docker-compose.yml             # Docker services configuration
-├── requirements.txt               # Python dependencies
-├── .env.example                   # Environment variables template
-└── README.md
-```
+
 
 ## ⚙️ DAG Configuration
 
